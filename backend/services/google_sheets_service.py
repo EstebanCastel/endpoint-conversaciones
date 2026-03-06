@@ -27,11 +27,28 @@ class GoogleSheetsService:
         self.spreadsheet = self.client.open_by_key(self.spreadsheet_id)
 
     def _get_credentials_info(self) -> dict:
-        credentials_json = os.getenv("GOOGLE_SHEETS_CREDENTIALS", "")
-        if not credentials_json:
+        credentials_raw = os.getenv("GOOGLE_SHEETS_CREDENTIALS", "")
+        if not credentials_raw:
             raise ValueError("GOOGLE_SHEETS_CREDENTIALS no esta configurado")
 
-        credentials_info = json.loads(credentials_json)
+        candidate = credentials_raw.strip()
+
+        # Soporta pegar el valor como:
+        # GOOGLE_SHEETS_CREDENTIALS={...json...}
+        if candidate.startswith("GOOGLE_SHEETS_CREDENTIALS="):
+            candidate = candidate.split("=", 1)[1].strip()
+
+        # Soporta JSON envuelto entre comillas
+        if (candidate.startswith("'") and candidate.endswith("'")) or (
+            candidate.startswith('"') and candidate.endswith('"')
+        ):
+            candidate = candidate[1:-1]
+
+        try:
+            credentials_info = json.loads(candidate)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"GOOGLE_SHEETS_CREDENTIALS invalido: {e}") from e
+
         if "private_key" in credentials_info:
             credentials_info["private_key"] = credentials_info["private_key"].replace("\\n", "\n")
         return credentials_info
